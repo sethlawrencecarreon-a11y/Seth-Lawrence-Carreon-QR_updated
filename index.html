@@ -386,7 +386,27 @@
     document.getElementById('lang-pill').textContent = name;
   }
 
-  // ── Image capture for OCR ───────────────────────────────────────
+  // ── Text cleaning function ──────────────────────────────────────
+  function cleanExtractedText(rawText) {
+    if (!rawText || typeof rawText !== 'string') return '';
+
+    return rawText
+      // Remove non-alphabetic characters except spaces, periods, commas, apostrophes, hyphens
+      .replace(/[^a-zA-Z\s.,'-]/g, ' ')
+      // Remove extra whitespace
+      .replace(/\s+/g, ' ')
+      // Remove lines that are too short (likely noise or icons)
+      .split('\n')
+      .filter(line => line.trim().length >= 3)
+      // Remove lines that contain mostly numbers or symbols
+      .filter(line => {
+        const alphaChars = line.replace(/[^a-zA-Z]/g, '').length;
+        const totalChars = line.replace(/\s/g, '').length;
+        return totalChars > 0 && (alphaChars / totalChars) > 0.3; // At least 30% alphabetic
+      })
+      .join(' ')
+      .trim();
+  }
   async function startImageCapture() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -445,12 +465,19 @@
           logger: m => console.log(m)
         });
 
-        if (!text.trim()) {
-          showError('No text found in the captured image.\n\nPlease try capturing a clearer image with visible text.');
+        console.log('Raw OCR Result:', text);
+
+        // Filter and clean the extracted text
+        const cleanedText = cleanExtractedText(text);
+        console.log('Cleaned OCR Result:', cleanedText);
+
+        if (!cleanedText) {
+          showError('No readable text found in the captured image.\n\nPlease ensure the text is clear and well-lit, and try again.');
           return;
         }
 
-        const { translation, srcLang } = await translateToTagalog(text.trim());
+        console.log('Translating cleaned text:', cleanedText);
+        const { translation, srcLang } = await translateToTagalog(cleanedText);
         renderResult(text.trim(), translation, srcLang);
         showScreen('result-screen');
       } catch (err) {
