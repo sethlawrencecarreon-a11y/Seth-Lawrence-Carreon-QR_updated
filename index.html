@@ -209,8 +209,6 @@
   </div>
   <button class="btn btn-primary" id="start-btn" onclick="startScanner()">📷 Start Camera for QR</button>
   <button class="btn btn-ghost" onclick="startImageCapture()">📸 Capture Image for Text</button>
-  <button class="btn btn-ghost" onclick="document.getElementById('image-input').click()">🖼️ Upload Image for Text</button>
-  <input type="file" id="image-input" accept="image/*" style="display:none" onchange="handleImageUpload(event)">
   <button class="btn btn-stop"    id="stop-btn"  style="display:none" onclick="stopScanner()">⏹ Stop Camera</button>
 </div>
 
@@ -400,8 +398,10 @@
       video.srcObject = stream;
       video.autoplay = true;
       video.style.width = '100%';
-      video.style.maxWidth = '300px';
+      video.style.height = 'auto';
+      video.style.maxWidth = '100%';
       video.style.borderRadius = '14px';
+      video.style.objectFit = 'cover';
 
       const captureBtn = document.createElement('button');
       captureBtn.className = 'btn btn-primary';
