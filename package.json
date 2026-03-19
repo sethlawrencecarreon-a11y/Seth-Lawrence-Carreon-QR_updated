@@ -1,0 +1,14 @@
+{
+  "name": "qr-tagalog-translator",
+  "version": "1.0.0",
+  "description": "QR & Image Tagalog Translator",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx serve .",
+    "build": "echo No build step required",
+    "start": "npx serve ."
+  },
+  "keywords": ["qr", "translator", "tagalog", "ocr"],
+  "author": "Seth Lawrence Carreon",
+  "license": "MIT"
+}

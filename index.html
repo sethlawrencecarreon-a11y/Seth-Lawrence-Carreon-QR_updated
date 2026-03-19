@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>QR & Image Tagalog Translator</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#ff8c00">
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg:        #f5f5dc; /* Khaki background */
+      --surface:   #e6e6cc; /* Light khaki surface */
+      --surface2:  #d4d4aa; /* Medium khaki */
+      --border:    #b8b894; /* Khaki border */
+      --text:      #2d2d1a; /* Dark khaki text */
+      --muted:     #6b6b47; /* Muted khaki */
+      --primary:   #ff8c00; /* Dark orange for primary */
+      --primary-l: #ffa500; /* Orange */
+      --success:   #32cd32; /* Lime green */
+      --danger:    #ff6347; /* Tomato red */
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, #daa520 0%, #ff8c00 100%); /* Golden to orange gradient */
+      padding: 18px 16px 14px;
+      text-align: center;
+      flex-shrink: 0;
+      border-radius: 0 0 20px 20px; /* Rounded bottom corners */
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    header .icon  { font-size: 1.7rem; line-height: 1; }
+    header h1     { font-size: 1.2rem; font-weight: 700; margin-top: 4px; }
+    header p      { font-size: 0.78rem; opacity: .82; margin-top: 3px; }
+
+    /* ── Screens ─────────────────────────────────────────────────── */
+    .screen {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      padding: 16px;
+      max-width: 520px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .screen.active { display: flex; }
+
+    /* ── Scan screen ─────────────────────────────────────────────── */
+    .scan-hint {
+      text-align: center;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    #reader {
+      border-radius: 14px;
+      overflow: hidden;
+      background: var(--surface);
+      width: 100%;
+    }
+
+    /* Hide html5-qrcode's file-upload / extra controls */
+    #reader__dashboard_section_filesel,
+    #reader__dashboard_section_swaplink,
+    #html5-qrcode-button-file-selection,
+    #reader__header_message { display: none !important; }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+    .pulse-dot {
+      width: 8px; height: 8px;
+      background: var(--success);
+      border-radius: 50%;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* ── Buttons ─────────────────────────────────────────────────── */
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 13px;
+      border: none;
+      border-radius: 25px; /* More rounded buttons */
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: opacity .15s, transform .1s;
+      -webkit-tap-highlight-color: transparent;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1); /* Cartoon shadow */
+    }
+    .btn:active { opacity: .8; transform: scale(.98); }
+    .btn-primary { background: linear-gradient(135deg, #ff8c00, #daa520); color:#fff; }
+    .btn-stop    { background: var(--surface); color: var(--danger); border:1px solid var(--border); }
+    .btn-ghost   { background: transparent; color: var(--primary-l); border:1.5px solid var(--primary); }
+
+    /* ── Loading screen ──────────────────────────────────────────── */
+    #loading-screen { align-items:center; justify-content:center; gap:14px; }
+    .spinner {
+      width: 42px; height: 42px;
+      border: 4px solid var(--border);
+      border-top-color: var(--primary-l);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-label { color: var(--muted); font-size: .9rem; }
+
+    /* ── Result screen ───────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border-radius: 20px; /* More rounded */
+      padding: 14px 15px;
+      margin-bottom: 10px;
+      border: 2px solid var(--border);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1); /* Cartoon shadow */
+    }
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .card-label {
+      font-size: .68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: #475569;
+    }
+    .lang-pill {
+      background: var(--surface2);
+      color: #94a3b8;
+      padding: 2px 9px;
+      border-radius: 6px;
+      font-size: .68rem;
+      font-weight: 600;
+    }
+    .card-body {
+      font-size: .95rem;
+      line-height: 1.55;
+      color: #e2e8f0;
+      word-break: break-word;
+    }
+    .card.tl-card {
+      background: linear-gradient(155deg, #1e1b4b, #2e1065);
+      border: 1px solid #4c1d95;
+    }
+    .card.tl-card .card-label { color: #fff; } /* White text on gradient */
+    .card.tl-card .card-body  { color: #fff; font-size: 1rem; }
+
+    /* ── Error screen ────────────────────────────────────────────── */
+    .error-box {
+      background: #ffe4e1; /* Light pink background */
+      border: 2px solid #ff6347;
+      border-radius: 20px; /* More rounded */
+      padding: 16px;
+      color: #8b0000; /* Dark red text */
+      font-size: .88rem;
+      line-height: 1.55;
+      text-align: center;
+      margin-bottom: 12px;
+      white-space: pre-line;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="icon">🇵🇭 📷</div>
+  <h1>QR & Image Tagalog Translator</h1>
+  <p>Scan QR codes or capture images • Get instant Tagalog translation</p>
+</header>
+
+<!-- ══ SCAN SCREEN ══════════════════════════════════════════════════ -->
+<div class="screen active" id="scan-screen">
+  <p class="scan-hint">Point your camera at a QR code to begin</p>
+  <div id="reader"></div>
+  <div class="status-row" id="status-row" style="display:none">
+    <div class="pulse-dot"></div>
+    <span>Scanning — hold steady...</span>
+  </div>
+  <button class="btn btn-primary" id="start-btn" onclick="startScanner()">📷 Start Camera for QR</button>
+  <button class="btn btn-ghost" onclick="startImageCapture()">📸 Capture Image for Text</button>
+  <button class="btn btn-ghost" onclick="document.getElementById('image-input').click()">🖼️ Upload Image for Text</button>
+  <input type="file" id="image-input" accept="image/*" style="display:none" onchange="handleImageUpload(event)">
+  <button class="btn btn-stop"    id="stop-btn"  style="display:none" onclick="stopScanner()">⏹ Stop Camera</button>
+</div>
+
+<!-- ══ LOADING SCREEN ═══════════════════════════════════════════════ -->
+<div class="screen" id="loading-screen">
+  <div class="spinner"></div>
+  <p class="loading-label">Translating to Tagalog...</p>
+</div>
+
+<!-- ══ RESULT SCREEN ════════════════════════════════════════════════ -->
+<div class="screen" id="result-screen">
+  <div class="card">
+    <div class="card-head">
+      <span class="card-label">Original Text</span>
+      <span class="lang-pill" id="lang-pill">Unknown</span>
+    </div>
+    <p class="card-body" id="original-text"></p>
+  </div>
+
+  <div class="card tl-card">
+    <div class="card-head">
+      <span class="card-label">🇵🇭 &nbsp;Tagalog Translation</span>
+    </div>
+    <p class="card-body" id="translated-text"></p>
+  </div>
+
+  <button class="btn btn-primary" onclick="resetToScan()">🔄 Scan Another</button>
+</div>
+
+<!-- ══ ERROR SCREEN ══════════════════════════════════════════════════ -->
+<div class="screen" id="error-screen">
+  <div class="error-box" id="error-box"></div>
+  <button class="btn btn-ghost" onclick="resetToScan()">↩ Try Again</button>
+</div>
+
+<script>
+  // ── State ────────────────────────────────────────────────────────
+  let qrScanner = null;
+  let scanning  = false;
+  let imageCaptureStream = null;
+
+  // ── Language code → display name ────────────────────────────────
+  const LANG = {
+    af:'Afrikaans', ar:'Arabic', az:'Azerbaijani', be:'Belarusian',
+    bg:'Bulgarian', bn:'Bengali', bs:'Bosnian', ca:'Catalan',
+    ceb:'Cebuano', cs:'Czech', cy:'Welsh', da:'Danish',
+    de:'German', el:'Greek', en:'English', eo:'Esperanto',
+    es:'Spanish', et:'Estonian', eu:'Basque', fa:'Persian/Farsi',
+    fi:'Finnish', fr:'French', ga:'Irish', gl:'Galician',
+    gu:'Gujarati', ha:'Hausa', hi:'Hindi', hr:'Croatian',
+    ht:'Haitian Creole', hu:'Hungarian', hy:'Armenian',
+    id:'Indonesian', is:'Icelandic', it:'Italian', iw:'Hebrew',
+    ja:'Japanese', jw:'Javanese', ka:'Georgian', kk:'Kazakh',
+    km:'Khmer', kn:'Kannada', ko:'Korean', ku:'Kurdish',
+    ky:'Kyrgyz', la:'Latin', lo:'Lao', lt:'Lithuanian',
+    lv:'Latvian', mg:'Malagasy', mi:'Maori', mk:'Macedonian',
+    ml:'Malayalam', mn:'Mongolian', mr:'Marathi', ms:'Malay',
+    mt:'Maltese', my:'Burmese', ne:'Nepali', nl:'Dutch',
+    no:'Norwegian', pa:'Punjabi', pl:'Polish', ps:'Pashto',
+    pt:'Portuguese', ro:'Romanian', ru:'Russian', si:'Sinhala',
+    sk:'Slovak', sl:'Slovenian', sm:'Samoan', sn:'Shona',
+    so:'Somali', sq:'Albanian', sr:'Serbian', sv:'Swedish',
+    sw:'Swahili', ta:'Tamil', te:'Telugu', tg:'Tajik',
+    th:'Thai', tl:'Filipino/Tagalog', tr:'Turkish', uk:'Ukrainian',
+    ur:'Urdu', uz:'Uzbek', vi:'Vietnamese', xh:'Xhosa',
+    yi:'Yiddish', yo:'Yoruba', zu:'Zulu',
+    zh:'Chinese', 'zh-CN':'Chinese (Simplified)', 'zh-TW':'Chinese (Traditional)',
+    fil:'Filipino/Tagalog',
+  };
+
+  // ── Screen helpers ───────────────────────────────────────────────
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function resetToScan() {
+    showScreen('scan-screen');
+    document.getElementById('start-btn').style.display = '';
+    document.getElementById('stop-btn').style.display  = 'none';
+    document.getElementById('status-row').style.display = 'none';
+    document.getElementById('reader').innerHTML = '';
+    qrScanner = null;
+    scanning  = false;
+    if (imageCaptureStream) {
+      imageCaptureStream.getTracks().forEach(track => track.stop());
+      imageCaptureStream = null;
+    }
+  }
+
+  // ── Scanner ──────────────────────────────────────────────────────
+  function startScanner() {
+    qrScanner = new Html5Qrcode('reader');
+
+    qrScanner.start(
+      { facingMode: 'environment' },                 // rear camera
+      { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1 },
+      onQRDecoded,
+      () => {}                                       // suppress per-frame scan errors
+    ).then(() => {
+      scanning = true;
+      document.getElementById('start-btn').style.display  = 'none';
+      document.getElementById('stop-btn').style.display   = '';
+      document.getElementById('status-row').style.display = '';
+    }).catch(err => {
+      showError(
+        'Camera access denied.\n\nPlease allow camera permissions in your browser settings and try again.\n\n'
+        + '(Also make sure you are opening this page over HTTPS or localhost.)'
+      );
+    });
+  }
+
+  async function stopScanner(updateUI = true) {
+    if (qrScanner && scanning) {
+      try { await qrScanner.stop(); qrScanner.clear(); } catch (_) {}
+      scanning = false;
+    }
+    if (updateUI) {
+      document.getElementById('start-btn').style.display   = '';
+      document.getElementById('stop-btn').style.display    = 'none';
+      document.getElementById('status-row').style.display  = 'none';
+    }
+  }
+
+  // ── QR decode callback ───────────────────────────────────────────
+  async function onQRDecoded(rawText) {
+    await stopScanner(false);        // stop camera silently
+    showScreen('loading-screen');
+
+    try {
+      const { translation, srcLang } = await translateToTagalog(rawText);
+      renderResult(rawText, translation, srcLang);
+      showScreen('result-screen');
+    } catch (_) {
+      showError('Translation failed.\n\nPlease check your internet connection and try again.');
+    }
+  }
+
+  // ── Translation (Google unofficial → MyMemory fallback) ──────────
+  async function translateToTagalog(text) {
+    // Primary: unofficial Google Translate (no API key required)
+    try {
+      const url = 'https://translate.googleapis.com/translate_a/single'
+        + `?client=gtx&sl=auto&tl=tl&dt=t&q=${encodeURIComponent(text)}`;
+      const res  = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+
+      let out = '';
+      for (const seg of (data[0] ?? [])) { if (seg?.[0]) out += seg[0]; }
+      return { translation: out || text, srcLang: data[2] ?? 'unknown' };
+    } catch (_) { /* fall through */ }
+
+    // Fallback: MyMemory (free, 1000 words/day, no key needed)
+    const url2 = 'https://api.mymemory.translated.net/get'
+      + `?q=${encodeURIComponent(text)}&langpair=autodetect|tl`;
+    const res2 = await fetch(url2);
+    if (!res2.ok) throw new Error('All services failed');
+    const d2 = await res2.json();
+    return {
+      translation: d2.responseData?.translatedText ?? text,
+      srcLang: 'unknown',
+    };
+  }
+
+  // ── Render result ─────────────────────────────────────────────────
+  function renderResult(original, translation, srcLang) {
+    document.getElementById('original-text').textContent   = original;
+
+    const isTL = (srcLang === 'tl' || srcLang === 'fil');
+    document.getElementById('translated-text').textContent =
+      isTL ? '(Text is already in Filipino/Tagalog)' : (translation || '(no translation)');
+
+    const name = LANG[srcLang] ?? (srcLang !== 'unknown' ? srcLang.toUpperCase() : 'Unknown');
+    document.getElementById('lang-pill').textContent = name;
+  }
+
+  // ── Image capture for OCR ───────────────────────────────────────
+  async function startImageCapture() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+      imageCaptureStream = stream;
+
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.autoplay = true;
+      video.style.width = '100%';
+      video.style.maxWidth = '300px';
+      video.style.borderRadius = '14px';
+
+      const captureBtn = document.createElement('button');
+      captureBtn.className = 'btn btn-primary';
+      captureBtn.innerHTML = '📸 Capture';
+      captureBtn.onclick = () => captureImage(video);
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'btn btn-stop';
+      cancelBtn.innerHTML = '❌ Cancel';
+      cancelBtn.onclick = () => stopImageCapture();
+
+      document.getElementById('reader').innerHTML = '';
+      document.getElementById('reader').appendChild(video);
+      document.getElementById('reader').appendChild(captureBtn);
+      document.getElementById('reader').appendChild(cancelBtn);
+
+      document.getElementById('start-btn').style.display = 'none';
+      document.getElementById('stop-btn').style.display = 'none';
+      document.getElementById('status-row').style.display = 'none';
+    } catch (err) {
+      showError(
+        'Camera access denied.\n\nPlease allow camera permissions in your browser settings and try again.\n\n'
+        + '(Also make sure you are opening this page over HTTPS or localhost.)'
+      );
+    }
+  }
+
+  async function captureImage(video) {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+
+    canvas.toBlob(async (blob) => {
+      await stopImageCapture();
+      showScreen('loading-screen');
+
+      try {
+        const { data: { text } } = await Tesseract.recognize(blob, 'eng', {
+          logger: m => console.log(m)
+        });
+
+        if (!text.trim()) {
+          showError('No text found in the captured image.\n\nPlease try capturing a clearer image with visible text.');
+          return;
+        }
+
+        const { translation, srcLang } = await translateToTagalog(text.trim());
+        renderResult(text.trim(), translation, srcLang);
+        showScreen('result-screen');
+      } catch (err) {
+        console.error('OCR Error:', err);
+        showError('Failed to extract text from captured image.\n\nPlease try again or use image upload.');
+      }
+    });
+  }
+
+  async function stopImageCapture() {
+    if (imageCaptureStream) {
+      imageCaptureStream.getTracks().forEach(track => track.stop());
+      imageCaptureStream = null;
+    }
+    document.getElementById('reader').innerHTML = '';
+    document.getElementById('start-btn').style.display = '';
+    document.getElementById('stop-btn').style.display = 'none';
+    document.getElementById('status-row').style.display = 'none';
+  }
+</script>
+</body>
+</html>
